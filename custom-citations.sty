@@ -1,0 +1,48 @@
+%% custom-citations.sty
+%%
+%% 修改 biblatex 英文引用格式：
+%% 当且仅当恰好有两位作者时：
+%%   - \cite（及 \parencite 等）使用 " & " 连接两位作者
+%%   - \textcite 使用 " 和 " 连接两位作者
+%% 其他情况不变
+%%
+%% 用法（在 \usepackage[...]{biblatex} 之后加载）：
+%%   \usepackage{custom-citations}
+
+\ProvidesPackage{custom-citations}[2024/01/01 Custom two-author citation delimiters]
+
+\RequirePackage{etoolbox}
+\RequirePackage{xparse}
+
+%% 标记：当前是否处于 \textcite 上下文
+\newtoggle{cbx@intextcite}
+
+%% 在 \begin{document} 时（biblatex 已完成所有初始化后）进行修改，
+%% 以确保无论本包与 biblatex 的加载顺序如何，都能正确覆盖最终定义。
+\AtBeginDocument{%
+  %% 保存 biblatex 原始的 \finalnamedelim
+  \let\cbx@orig@finalnamedelim\finalnamedelim
+  %% 重定义 \finalnamedelim：
+  %%   - 来源恰好两位作者时：根据上下文选择 " & "（\cite）或 " 和 "（\textcite）
+  %%   - 其他情况：使用原始定义，保持默认行为不变
+  %% 注：使用 listtotal（来源总作者数）而非 liststop（截断后显示数），
+  %%     以确保当且仅当原文确实只有两位作者时才应用特殊连接符。
+  \renewcommand*{\finalnamedelim}{%
+    \ifnum\value{listtotal}=2\relax
+      \iftoggle{cbx@intextcite}%
+        {\addspace 和\addspace}%
+        {\addspace\&\addspace}%
+    \else
+      \cbx@orig@finalnamedelim
+    \fi}%
+  %% 包装 \textcite，在调用前后设置/清除上下文标记
+  %% 签名：\textcite[prenote][postnote]{keys}
+  %%   - 两个可选参数均可省略（省略时传入空字符串，效果相同）
+  %%   - keys 可以是逗号分隔的多个条目键（如 \textcite{key1,key2}）
+  \let\cbx@orig@textcite\textcite
+  \RenewDocumentCommand{\textcite}{O{}O{}m}{%
+    \toggletrue{cbx@intextcite}%
+    \cbx@orig@textcite[#1][#2]{#3}%
+    \togglefalse{cbx@intextcite}%
+  }%
+}
